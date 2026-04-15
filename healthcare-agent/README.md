@@ -144,43 +144,17 @@ Useful commands:
 uv run pytest
 ```
 
-## LangSmith Studio (Local Dev UI)
+## Langfuse Tracing
 
-This repo includes `langgraph.json` configured for Studio and local Agent Server.
+For local debugging, I've used [Langfuse](https://langfuse.com/self-hosting/deployment/docker-compose#get-started).
 
-1. Add to `.env`:
+The simplest way to do so is cloning the Langfuse repo and using `docker compose`, [as shown here](https://langfuse.com/self-hosting/deployment/docker-compose#get-started).
 
-```bash
-LANGSMITH_API_KEY=lsv2_...
-LANGSMITH_PROJECT=healthcare-agent-local
-LANGSMITH_TRACING=true
-```
+  git clone https://github.com/langfuse/langfuse.git
+  cd langfuse
+  docker compose up
 
-If you want Studio without sending traces to LangSmith, set:
-
-```bash
-LANGSMITH_TRACING=false
-```
-
-2. Install/update deps:
-
-```bash
-uv sync
-```
-
-3. Run local Agent Server:
-
-```bash
-uv run langgraph dev
-```
-
-4. Open Studio:
-
-`https://smith.langchain.com/studio/?baseUrl=http://127.0.0.1:2024`
-
-## Langfuse Tracing (FastAPI)
-
-If Langfuse is running separately, add these app env vars:
+Then access `http://localhost:3000/`, sign up, create an org and copy the env vars. Then, add these app env vars to `healthcare-agent/.env`:
 
 ```bash
 LANGFUSE_PUBLIC_KEY=pk-lf-...
