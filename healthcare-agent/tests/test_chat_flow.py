@@ -1,6 +1,6 @@
-from session_store import bind_thread, get_session, reset_all_sessions
-from mock_data import APPOINTMENTS, reset_appointments
-from tools import (
+from app.domain.mock_data import APPOINTMENTS, reset_appointments
+from app.session.store import bind_thread, get_session, reset_all_sessions
+from app.tools.appointment_tools import (
     cancel_appointment,
     confirm_appointment,
     list_appointments,
