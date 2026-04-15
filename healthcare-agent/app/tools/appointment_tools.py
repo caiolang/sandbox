@@ -104,7 +104,7 @@ def verify_patient(
         normalized = normalize_dob(date_of_birth)
         if normalized is None:
             return (
-                "I couldn't parse the date of birth. Please use YYYY-MM-DD "
+                "COULDN'T PARSE DATE OF BIRTH. PLEASE USE YYYY-MM-DD "
                 "(for example, 1989-03-20)."
             )
         session.identity_fields["date_of_birth"] = normalized
@@ -121,7 +121,7 @@ def verify_patient(
             "date_of_birth": "date of birth",
         }
         missing_label = ", ".join(labels[item] for item in missing)
-        return f"Thanks. I still need your {missing_label} to verify your identity."
+        return f"STILL MISSING {missing_label}. ASK THE USER FOR THIS INFORMATION."
 
     patient = find_patient(
         session.identity_fields["full_name"],
