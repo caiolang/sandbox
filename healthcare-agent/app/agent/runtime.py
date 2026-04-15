@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+from typing import Any
 
 from langchain.agents import create_agent
 from langchain_openai import ChatOpenAI
@@ -11,6 +12,12 @@ from app.session.store import bind_thread
 from app.tools.appointment_tools import ALL_TOOLS
 
 load_dotenv()
+try:
+    from langfuse.langchain import CallbackHandler
+
+    langfuse_handler = CallbackHandler()
+except Exception:
+    langfuse_handler = None
 
 
 SYSTEM_PROMPT = """You are a clinic virtual assistant.
@@ -69,11 +76,22 @@ def _message_to_text(content: object) -> str:
     return str(content)
 
 
-def invoke_assistant(thread_id: str, user_message: str) -> str:
-    config = {
+def _build_invoke_config(thread_id: str) -> dict[str, Any]:
+    config: dict[str, Any] = {
         "configurable": {"thread_id": thread_id},
         "recursion_limit": 10,
+        "metadata": {"thread_id": thread_id},
     }
+
+    if langfuse_handler is not None:
+        config["callbacks"] = [langfuse_handler]
+        config["metadata"]["langfuse_session_id"] = thread_id
+
+    return config
+
+
+def invoke_assistant(thread_id: str, user_message: str) -> str:
+    config = _build_invoke_config(thread_id)
     with bind_thread(thread_id):
         result = _get_agent().invoke(
             {"messages": [{"role": "user", "content": user_message}]},

@@ -1,3 +1,6 @@
+caiolang@gmail.com
+LangfusePassword123!
+
 # Healthcare Appointment Conversational Agent
 
 A FastAPI backend that exposes a single conversational endpoint (`POST /chat`) for clinic patients to manage appointments.
@@ -175,47 +178,17 @@ uv run langgraph dev
 
 `https://smith.langchain.com/studio/?baseUrl=http://127.0.0.1:2024`
 
-## Local Langfuse (Docker Compose)
+## Langfuse Tracing (FastAPI)
 
-This repo includes a reproducible local Langfuse stack:
-
-- Compose file: `infra/langfuse/docker-compose.yml`
-- Env template: `infra/langfuse/.env.example`
-
-1. Prepare Langfuse infra env:
+If Langfuse is running separately, add these app env vars:
 
 ```bash
-cp infra/langfuse/.env.example infra/langfuse/.env
-```
-
-Then replace all placeholder secrets in `infra/langfuse/.env`.
-
-2. Start local Langfuse:
-
-```bash
-docker compose --env-file infra/langfuse/.env -f infra/langfuse/docker-compose.yml up -d
-```
-
-3. Open UI:
-
-`http://localhost:3000`
-
-4. Create a Langfuse project and copy keys, then add these to your app `.env`:
-
-```bash
-LANGFUSE_BASE_URL=http://localhost:3000
 LANGFUSE_PUBLIC_KEY=pk-lf-...
 LANGFUSE_SECRET_KEY=sk-lf-...
+LANGFUSE_BASE_URL=http://localhost:3000
 ```
 
-5. Start FastAPI app and chat as usual:
-
-```bash
-uv run fastapi dev main.py
-uv run python scripts/chat_cli.py
-```
-
-When `LANGFUSE_PUBLIC_KEY` and `LANGFUSE_SECRET_KEY` are set, `/chat` requests are traced to Langfuse automatically.
+The backend initializes `langfuse.langchain.CallbackHandler` and attaches it to each agent invocation, so `/chat` requests are traced automatically.
 
 ## Current limitations (intentional for v1)
 
