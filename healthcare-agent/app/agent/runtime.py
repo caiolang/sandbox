@@ -7,8 +7,8 @@ from langchain_openai import ChatOpenAI
 from langgraph.checkpoint.memory import MemorySaver
 from dotenv import load_dotenv
 
-from session_store import bind_thread
-from tools import ALL_TOOLS
+from app.session.store import bind_thread
+from app.tools.appointment_tools import ALL_TOOLS
 
 load_dotenv()
 
@@ -84,3 +84,7 @@ def invoke_assistant(thread_id: str, user_message: str) -> str:
     if not messages:
         return "I wasn't able to produce a response. Please try again."
     return _message_to_text(messages[-1].content)
+
+
+def get_graph():
+    return _get_agent()

@@ -1,11 +1,12 @@
 from __future__ import annotations
 
 import re
+from typing import Any
 
 from langchain_core.tools import tool
 
-from mock_data import APPOINTMENTS, find_patient, get_appointments_for_patient, normalize_dob
-from session_store import get_current_session
+from app.domain.mock_data import APPOINTMENTS, find_patient, get_appointments_for_patient, normalize_dob
+from app.session.store import SessionState, get_current_session
 
 
 ORDINAL_MAP = {
@@ -27,14 +28,14 @@ ORDINAL_MAP = {
 }
 
 
-def _session_or_message() -> tuple[object | None, str | None]:
+def _session_or_message() -> tuple[SessionState | None, str | None]:
     session = get_current_session()
     if session is None:
         return None, "Internal error: no active thread context was provided."
     return session, None
 
 
-def _require_verified_session() -> tuple[object | None, str | None]:
+def _require_verified_session() -> tuple[SessionState | None, str | None]:
     session, err = _session_or_message()
     if err:
         return None, err
@@ -47,7 +48,7 @@ def _require_verified_session() -> tuple[object | None, str | None]:
     return session, None
 
 
-def _format_appointment_line(index: int, appointment) -> str:
+def _format_appointment_line(index: int, appointment: Any) -> str:
     return (
         f"{index}. ID: {appointment.appointment_id} | {appointment.specialty} with {appointment.clinician} | "
         f"{appointment.datetime} | {appointment.location} | status: {appointment.status}"
