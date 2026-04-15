@@ -601,6 +601,7 @@ dependencies = [
     { name = "pydantic" },
     { name = "pytest" },
     { name = "python-dotenv" },
+    { name = "rich" },
 ]
 
 [package.metadata]
@@ -614,6 +615,7 @@ requires-dist = [
     { name = "pydantic", specifier = ">=2.13.0" },
     { name = "pytest", specifier = ">=8.4.2" },
     { name = "python-dotenv", specifier = ">=1.1.1" },
+    { name = "rich", specifier = ">=14.2.0" },
 ]
 
 [[package]]

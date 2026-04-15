@@ -5,6 +5,13 @@ import json
 import uuid
 from urllib import error, request
 
+from rich.console import Console
+from rich.panel import Panel
+from rich.prompt import Prompt
+from rich.table import Table
+
+console = Console()
+
 
 def post_chat(endpoint: str, thread_id: str, message: str) -> dict:
     payload = json.dumps({"thread_id": thread_id, "message": message}).encode("utf-8")
@@ -20,12 +27,15 @@ def post_chat(endpoint: str, thread_id: str, message: str) -> dict:
 
 
 def print_help() -> None:
-    print("Commands:")
-    print("  /help                 Show commands")
-    print("  /thread               Show current thread_id")
-    print("  /thread <id>          Switch to a new thread_id")
-    print("  /new                  Generate and switch to a random thread_id")
-    print("  /exit                 Exit the chat")
+    table = Table(title="Commands", header_style="bold cyan")
+    table.add_column("Command", style="bold")
+    table.add_column("Description")
+    table.add_row("/help", "Show commands")
+    table.add_row("/thread", "Show current thread_id")
+    table.add_row("/thread <id>", "Switch to a new thread_id")
+    table.add_row("/new", "Generate and switch to a random thread_id")
+    table.add_row("/exit", "Exit the chat")
+    console.print(table)
 
 
 def main() -> int:
@@ -45,23 +55,29 @@ def main() -> int:
     endpoint = args.endpoint
     thread_id = args.thread_id
 
-    print("Healthcare Agent CLI")
-    print(f"Endpoint: {endpoint}")
-    print(f"Thread:   {thread_id}")
-    print("Type /help for commands.\n")
+    console.print(
+        Panel.fit(
+            f"[bold]Healthcare Agent CLI[/bold]\n"
+            f"[cyan]Endpoint:[/cyan] {endpoint}\n"
+            f"[cyan]Thread:[/cyan] {thread_id}\n"
+            f"[dim]Type /help for commands.[/dim]",
+            border_style="blue",
+            title="Session",
+        )
+    )
 
     while True:
         try:
-            user_input = input("You: ").strip()
+            user_input = Prompt.ask("[bold green]You[/bold green]").strip()
         except (EOFError, KeyboardInterrupt):
-            print("\nBye.")
+            console.print("\n[bold yellow]Bye.[/bold yellow]")
             return 0
 
         if not user_input:
             continue
 
         if user_input == "/exit":
-            print("Bye.")
+            console.print("[bold yellow]Bye.[/bold yellow]")
             return 0
 
         if user_input == "/help":
@@ -69,35 +85,53 @@ def main() -> int:
             continue
 
         if user_input == "/thread":
-            print(f"Current thread_id: {thread_id}")
+            console.print(f"[cyan]Current thread_id:[/cyan] [bold]{thread_id}[/bold]")
             continue
 
         if user_input.startswith("/thread "):
             next_thread = user_input.split(" ", 1)[1].strip()
             if not next_thread:
-                print("Please provide a thread id after /thread")
+                console.print("[red]Please provide a thread id after /thread[/red]")
                 continue
             thread_id = next_thread
-            print(f"Switched to thread_id: {thread_id}")
+            console.print(f"[green]Switched to thread_id:[/green] [bold]{thread_id}[/bold]")
             continue
 
         if user_input == "/new":
             thread_id = f"demo-{uuid.uuid4().hex[:8]}"
-            print(f"Switched to new thread_id: {thread_id}")
+            console.print(f"[green]Switched to new thread_id:[/green] [bold]{thread_id}[/bold]")
             continue
 
         try:
             data = post_chat(endpoint=endpoint, thread_id=thread_id, message=user_input)
             reply = data.get("reply", "(no reply field in response)")
-            print(f"Assistant: {reply}\n")
+            console.print(
+                Panel(
+                    reply,
+                    title="[bold magenta]Assistant[/bold magenta]",
+                    border_style="magenta",
+                )
+            )
         except error.HTTPError as exc:
             body = exc.read().decode("utf-8", errors="replace")
-            print(f"HTTP {exc.code}: {body}\n")
+            console.print(
+                Panel(
+                    f"HTTP {exc.code}: {body}",
+                    title="[bold red]HTTP Error[/bold red]",
+                    border_style="red",
+                )
+            )
         except error.URLError as exc:
-            print(f"Connection error: {exc.reason}")
-            print("Make sure the FastAPI server is running and endpoint is correct.\n")
+            console.print(
+                Panel(
+                    f"Connection error: {exc.reason}\n"
+                    "Make sure the FastAPI server is running and endpoint is correct.",
+                    title="[bold red]Connection Error[/bold red]",
+                    border_style="red",
+                )
+            )
         except json.JSONDecodeError:
-            print("Received a non-JSON response from server.\n")
+            console.print("[red]Received a non-JSON response from server.[/red]")
 
 
 if __name__ == "__main__":
