@@ -89,6 +89,19 @@ def normalize_phone(value: str) -> str:
     return re.sub(r"\D", "", value)
 
 
+def _phones_match(a: str, b: str) -> bool:
+    if a == b:
+        return True
+
+    # Accept common US format variants with or without leading country code "1".
+    if len(a) == 10 and len(b) == 11 and b.startswith("1"):
+        return a == b[1:]
+    if len(b) == 10 and len(a) == 11 and a.startswith("1"):
+        return b == a[1:]
+
+    return False
+
+
 def normalize_dob(value: str) -> str | None:
     candidate = value.strip()
     known_formats = ("%Y-%m-%d", "%m/%d/%Y", "%m-%d-%Y", "%Y/%m/%d")
@@ -112,7 +125,7 @@ def find_patient(full_name: str, phone_number: str, date_of_birth: str) -> Patie
     for patient in PATIENTS:
         if (
             normalize_name(patient.full_name) == normalized_name
-            and normalize_phone(patient.phone_number) == normalized_phone
+            and _phones_match(normalize_phone(patient.phone_number), normalized_phone)
             and patient.date_of_birth == normalized_dob
         ):
             return patient
