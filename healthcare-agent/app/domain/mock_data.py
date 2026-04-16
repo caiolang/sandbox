@@ -26,13 +26,13 @@ class Appointment:
 
 
 PATIENTS: list[Patient] = [
-    Patient(
+    Patient( # Maria Silva, +1 (415) 555-1212, 20 march 1989
         patient_id="P001",
         full_name="Maria Silva",
         phone_number="+1 (415) 555-1212",
         date_of_birth="1989-03-20",
     ),
-    Patient(
+    Patient( # John Carter, (650) 555-0199, 5 november 1978
         patient_id="P002",
         full_name="John Carter",
         phone_number="(650) 555-0199",
