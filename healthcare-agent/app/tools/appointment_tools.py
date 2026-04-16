@@ -143,7 +143,7 @@ def verify_patient(
 
 @tool
 def list_appointments() -> str:
-    """List appointments for the verified patient."""
+    """List appointments for the verified patient. Remember to pass full appointment list back to user."""
     session, err = _require_verified_session()
     if err:
         return err
