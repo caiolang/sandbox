@@ -3,7 +3,7 @@
 
 This project uses a LangChain conversational agent to help patients manage their appointments. The key design goal is simple: **all appointment actions are blocked until identity verification succeeds**.
 
-This behavior is not left to prompt instructions alone: the **critical policy boundary** is enforced **deterministically** in the **tool layer**, which makes the system easier to test, debug, and evolve across model changes. This is of utmost importance in an evals-first environment.
+This behavior is not left to prompt instructions alone: the **critical policy boundary** is enforced **deterministically** in the **tool layer**, which makes the system easier to test, debug, and evolve across model changes.
 
 **This project includes:**
 1. A FastAPI backend that exposes a single conversational endpoint (`POST /chat`) for clinic patients to manage appointments.
