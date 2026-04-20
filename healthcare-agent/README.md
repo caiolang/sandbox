@@ -3,17 +3,34 @@
 
 This project uses a LangChain conversational agent to help patients manage their appointments. The key design goal is simple: **all appointment actions are blocked until identity verification succeeds**.
 
-This project has:
+This behavior is not left to prompt instructions alone: the **critical policy boundary** is enforced **deterministically** in the **tool layer**, which makes the system easier to test, debug, and evolve across model changes. This is of utmost importance in an evals-first environment.
+
+**This project includes:**
 1. A FastAPI backend that exposes a single conversational endpoint (`POST /chat`) for clinic patients to manage appointments.
 2. A CLI to easily interact with the backend.
-3. Simple evals and unit tests that could run on CI.
-4. Trace export to a Langfuse instance, [which could be run locally](README.md/#langfuse-tracing).
+3. Behavioral evals and unit tests that could run on CI.
+4. Trace export to a Langfuse instance, [which can be run locally](README.md/#langfuse-tracing).
+
+**Current limitations:**
+- In-memory only (no database persistence).
+- Mock data for users and appointments.
+- Session/auth state is per-process and per-thread.
+- No external auth token integration.
+- No streaming responses.
+
 
 
 ## How to run
 
+### Pre-requisites
 
-### Configuration
+#### 1️⃣ Dev environment
+
+Be sure to have [`uv` installed](https://docs.astral.sh/uv/getting-started/installation/).
+
+#### 2️⃣ LLM Provider
+
+Any OpenAI-compliant LLM provider is supported. For local testing, I recommend [Groq](https://console.groq.com/) for their fast inference and generous free tiers.
 
 Set these in environment variables or `.env`:
 
@@ -21,7 +38,9 @@ Set these in environment variables or `.env`:
 - `OPENAI_BASE_URL` (default: `https://api.groq.com/openai/v1`)
 - `OPENAI_MODEL` (default: `llama-3.3-70b-versatile`)
 
-Be sure to have [`uv` installed](https://docs.astral.sh/uv/getting-started/installation/).
+#### 3️⃣ Observability
+
+See [Langfuse Tracing](./README.md#langfuse-tracing).
 
 ### Backend
 
@@ -54,6 +73,24 @@ Useful CLI commands:
 uv run pytest
 ```
 
+Today, the test suite acts as a lightweight behavioral eval harness for the most important requirements in the prompt:
+
+- Access is denied before verification.
+- Verification can be completed progressively across multiple turns.
+- A verified patient can list, confirm, cancel, and reschedule.
+- The user can move naturally between actions without losing session state.
+- A new thread does not inherit another user's verification state.
+- Invalid transitions and bad inputs fail safely.
+
+This is intentionally narrower than a full LLM eval program, but it covers the highest-value failure modes first. We focus on evals based on code assertions, which are [cheaper to run and to maintain](https://hamel.dev/blog/posts/evals-faq/#q-should-i-build-automated-evaluators-for-every-failure-mode-i-find).
+
+#### How I would extend evals next
+
+If I were taking this beyond the exercise, the next step would be to add transcript-driven evals on top of the deterministic unit tests:
+
+- **Scenario evals:** a small corpus of multi-turn patient conversations with expected outcomes, such as whether verification was completed, whether a tool was called too early, and whether the final appointment state is correct.
+- **Observability-backed review (error analysis)**, using Langfuse traces to cluster recurring failure modes and convert them into new regression cases.
+- **LLM Judges** for persistent failure cases that can't be measured with a deterministic code assertion. These would need to be aligned on a dataset annotated by human domain experts.
 
 
 ## Project Layers at a Glance
@@ -168,7 +205,7 @@ Files: `app/api/schemas.py`, `tests/test_chat_flow.py`
   - thread isolation (new thread starts unverified)
 
 ### 7) Manual Interaction Client
-Files: `app/clients/chat_cli.py`, `scripts/chat_cli.py`
+File: `app/clients/chat_cli.py`
 
 - Lightweight terminal client for interactive testing.
 - Supports switching thread IDs during the same CLI session.
@@ -181,11 +218,23 @@ Files: `app/clients/chat_cli.py`, `scripts/chat_cli.py`
 4. Tool executes business logic and auth check against `session_store`.
 5. Tool result is returned to the agent, then to API response.
 
-## Design choices (why this shape)
+## Design choices
 
-- **Deterministic authorization** lives in session store and is used on tool cals. Prompt text additionally nudges the authorization to be done before attempting any other action, improving UX.
+- **Deterministic authorization** lives in session store and is used on tool calls. Prompt text additionally nudges the authorization to be done before attempting any other action, improving UX.
 - **Conversation quality** (memory, phrasing, rerouting) lives in agent + model.
 - **Mock-first implementation** keeps exercise scope tight while preserving realistic control flow.
+
+## Why this stands out for an evals-focused role
+
+I would highlight three deliberate choices in this implementation:
+
+- **Policy enforcement is below the prompt layer.** The highest-risk requirement in the challenge is preventing appointment access before identity verification. I implemented that as deterministic tool gating, so the safety rule is stable even if the model takes an unexpected path.
+  - **The core behavior is already expressed as executable checks.** The current test suite validates the contract that matters most for a conversational agent in healthcare: refusal before verification, progressive identity collection, thread isolation, allowed re-routing after verification, and invalid appointment state transitions.
+- **Tracing is built in for transcript-level review.** Langfuse integration makes it straightforward to inspect failures turn by turn, which is the feedback loop you need when moving from hand-written tests to broader conversational evals.
+
+That combination is the main architectural point I would emphasize in an interview: not just that the agent works, but that it is structured to be measurable.
+
+This is the framing I would use for the application: the project is not only a working agent, but a small eval-friendly system where the riskiest behaviors are deterministic, observable, and easy to turn into regressions.
 
 ## Langfuse Tracing
 
@@ -206,11 +255,3 @@ LANGFUSE_BASE_URL=http://localhost:3000
 ```
 
 The backend initializes `langfuse.langchain.CallbackHandler` and attaches it to each agent invocation, so `/chat` requests are traced automatically.
-
-## Current limitations (intentional for this experiment)
-
-- In-memory only (no database persistence).
-- Mock data for users and appointments.
-- Session/auth state is per-process and per-thread.
-- No external auth token integration.
-- No streaming responses.
