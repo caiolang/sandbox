@@ -7,7 +7,7 @@ This project has:
 1. A FastAPI backend that exposes a single conversational endpoint (`POST /chat`) for clinic patients to manage appointments.
 2. A CLI to easily interact with the backend.
 3. Simple evals and unit tests that could run on CI.
-4. Trace export to a Langfuse instance, which could be run locally.
+4. Trace export to a Langfuse instance, [which could be run locally](README.md/#langfuse-tracing).
 
 
 ## How to run
@@ -32,7 +32,7 @@ uv sync
 uv run fastapi dev main.py
 ```
 
-****### Interactive CLI
+### Interactive CLI
 
 In another terminal:
 
