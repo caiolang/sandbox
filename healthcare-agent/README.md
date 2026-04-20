@@ -18,8 +18,6 @@ This behavior is not left to prompt instructions alone: the **critical policy bo
 - No external auth token integration.
 - No streaming responses.
 
-
-
 ## How to run
 
 ### Pre-requisites
@@ -84,20 +82,112 @@ Today, the test suite acts as a lightweight behavioral eval harness for the most
 
 This is intentionally narrower than a full LLM eval program, but it covers the highest-value failure modes first. We focus on evals based on code assertions, which are [cheaper to run and to maintain](https://hamel.dev/blog/posts/evals-faq/#q-should-i-build-automated-evaluators-for-every-failure-mode-i-find).
 
-#### How I would extend evals next
+**How I would extend evals next**
 
-If I were taking this beyond the exercise, the next step would be to add transcript-driven evals on top of the deterministic unit tests:
+If I were taking this beyond the exercise, the next step would be:
 
-- **Scenario evals:** a small corpus of multi-turn patient conversations with expected outcomes, such as whether verification was completed, whether a tool was called too early, and whether the final appointment state is correct.
 - **Observability-backed review (error analysis)**, using Langfuse traces to cluster recurring failure modes and convert them into new regression cases.
+- **Scenario evals:** a small corpus of multi-turn patient conversations with expected outcomes, such as whether verification was completed, whether a tool was called too early, and whether the final appointment state is correct.
 - **LLM Judges** for persistent failure cases that can't be measured with a deterministic code assertion. These would need to be aligned on a dataset annotated by human domain experts.
 
+## Design
 
-## Project Layers at a Glance
+### What does this service do?
+
+- Verifies a patient progressively with 3 fields: full name, phone number, date of birth.
+- After verification, allows conversational appointment actions:
+  - list
+  - confirm
+  - cancel
+  - reschedule
+- Supports natural re-routing (for example: list -> confirm -> list -> reschedule).
+- Maintains conversation continuity per `thread_id`.
+
+
+### Design choices
+
+- **Deterministic authorization** lives in session store and is used on tool calls. Prompt text additionally nudges the authorization to be done before attempting any other action, improving UX.
+- **Conversation quality** (memory, phrasing, rerouting) lives in agent + model.
+- **Mock-first implementation** keeps exercise scope tight while preserving realistic control flow.
+
+### Sequence diagram
+
+```mermaid
+%%{init: {
+  "theme": "base",
+  "themeVariables": {
+    "primaryColor": "#eaf2ff",
+    "primaryTextColor": "#0f172a",
+    "lineColor": "#334155",
+    "actorBorder": "#334155",
+    "actorBkg": "#e0f2fe",
+    "actorTextColor": "#0f172a",
+    "signalColor": "#334155",
+    "signalTextColor": "#0f172a",
+    "labelBoxBkgColor": "#f8fafc",
+    "labelBoxBorderColor": "#94a3b8",
+    "loopTextColor": "#0f172a",
+    "noteBkgColor": "#fff7ed",
+    "noteBorderColor": "#fdba74"
+  }
+}}%%
+sequenceDiagram
+    autonumber
+  actor P as Patient
+  participant C as Client
+  participant A as API
+  participant R as Runtime
+  participant T as Tools
+  participant ST as Session+Domain
+
+  P->>C: list appointments
+  C->>A: POST /chat
+  A->>R: invoke_assistant(...)
+  R->>T: list_appointments()
+
+  T->>ST: verify + fetch data
+    alt Not verified
+    rect rgb(254, 242, 242)
+    ST-->>T: identity missing
+    T-->>R: refusal + ask identity fields
+    R-->>A: assistant reply
+    A-->>C: reply
+    C-->>P: ask name/phone/dob
+    end
+    else Verified
+    rect rgb(240, 253, 244)
+    ST-->>T: verified + appointments
+    T-->>R: formatted list
+    R-->>A: assistant reply
+    A-->>C: reply
+    C-->>P: show appointments
+    end
+    end
+
+  P->>C: confirm second one
+  C->>A: POST /chat
+  A->>R: invoke_assistant(...)
+  R->>T: confirm_appointment(ordinal)
+  T->>ST: resolve + transition
+  ST-->>T: updated status
+  T-->>R: confirmation message
+  R-->>A: assistant reply
+  A-->>C: reply
+  C-->>P: confirmation result
+```
+
+1. Client calls `POST /chat` with `thread_id` + user message.
+2. FastAPI passes message to `invoke_assistant(...)`.
+3. Agent runs with LangGraph memory (same `thread_id`), may decide to call tools.
+4. Tool executes business logic and auth check against `session_store`.
+5. Tool result is returned to the agent.
+6. Agent's response is sent to user OR agent calls another tool directly.
+
+### Project Layers
 
 ```text
 app/
-├── [agent] Agent Runtime (LangChain)
+├── [agent] Agent runtime, prompt (LangChain)
 │    > agent/runtime.py
 │
 ├── [api] API Layer (FastAPI + Schemas)
@@ -124,27 +214,15 @@ tests/
 ```
 
 
-## What this service does
+#### 1) API Layer (FastAPI)
 
-- Verifies a patient progressively with 3 fields: full name, phone number, date of birth.
-- After verification, allows conversational appointment actions:
-  - list
-  - confirm
-  - cancel
-  - reschedule
-- Supports natural re-routing (for example: list -> confirm -> list -> reschedule).
-- Maintains conversation continuity per `thread_id`.
-
-## Core Bricks (Architecture)
-
-### 1) API Layer (FastAPI)
 Files: `app/api/main.py`, `main.py`
 
 - Exposes `POST /chat`.
 - Accepts `{ thread_id, message }`.
 - Delegates to the agent runtime and returns `{ thread_id, reply }`.
 
-### 2) Agent Runtime (LangChain create_agent)
+#### 2) Agent Runtime (LangChain create_agent)
 File: `app/agent/runtime.py`
 
 - Uses `create_agent()` with:
@@ -153,8 +231,9 @@ File: `app/agent/runtime.py`
   - In-mem `MemorySaver` checkpointer for per-thread conversational memory
 - Loads env variables from `.env` using `python-dotenv`.
 - Invokes agent with `thread_id` and a recursion limit.
+- System prompt lives here.
 
-### 3) Authorization Session Store (Deterministic gate)
+#### 3) Authorization Session Store (Deterministic gate)
 File: `app/session/store.py`
 
 - In-memory registry keyed by `thread_id`.
@@ -164,7 +243,7 @@ File: `app/session/store.py`
   - last listed appointment IDs (used for ordinal references like "the second one")
 - This store is the **source of truth for auth checks**.
 
-### 4) Domain Data (Mock records)
+#### 4) Domain Data (Mock records)
 File: `app/domain/mock_data.py`
 
 - In-memory patients and appointments.
@@ -174,7 +253,7 @@ File: `app/domain/mock_data.py`
   - DOB parsing (`YYYY-MM-DD`, `MM/DD/YYYY`, etc.)
 - Appointment reset helper for tests.
 
-### 5) Tool Layer (Business rules + hard gating)
+#### 5) Tool Layer (Business rules + hard gating)
 File: `app/tools/appointment_tools.py`
 
 Tools exposed to the agent:
@@ -193,7 +272,7 @@ Important behavior:
   - ordinal reference (`first`, `second`, `3`, etc.) from the latest listed appointments.
 - Handles invalid references and terminal status behavior (for example, canceled cannot be reconfirmed).
 
-### 6) Contracts and Testing
+#### 6) Contracts and Testing
 Files: `app/api/schemas.py`, `tests/test_chat_flow.py`
 
 - `schemas.py` defines request/response models.
@@ -204,37 +283,11 @@ Files: `app/api/schemas.py`, `tests/test_chat_flow.py`
   - repeated cancel messaging
   - thread isolation (new thread starts unverified)
 
-### 7) Manual Interaction Client
+#### 7) Manual Interaction Client
 File: `app/clients/chat_cli.py`
 
 - Lightweight terminal client for interactive testing.
 - Supports switching thread IDs during the same CLI session.
-
-## End-to-end Request Flow
-
-1. Client calls `POST /chat` with `thread_id` + user message.
-2. FastAPI passes message to `invoke_assistant(...)`.
-3. Agent runs with LangGraph memory (same `thread_id`), may decide to call tools.
-4. Tool executes business logic and auth check against `session_store`.
-5. Tool result is returned to the agent, then to API response.
-
-## Design choices
-
-- **Deterministic authorization** lives in session store and is used on tool calls. Prompt text additionally nudges the authorization to be done before attempting any other action, improving UX.
-- **Conversation quality** (memory, phrasing, rerouting) lives in agent + model.
-- **Mock-first implementation** keeps exercise scope tight while preserving realistic control flow.
-
-## Why this stands out for an evals-focused role
-
-I would highlight three deliberate choices in this implementation:
-
-- **Policy enforcement is below the prompt layer.** The highest-risk requirement in the challenge is preventing appointment access before identity verification. I implemented that as deterministic tool gating, so the safety rule is stable even if the model takes an unexpected path.
-  - **The core behavior is already expressed as executable checks.** The current test suite validates the contract that matters most for a conversational agent in healthcare: refusal before verification, progressive identity collection, thread isolation, allowed re-routing after verification, and invalid appointment state transitions.
-- **Tracing is built in for transcript-level review.** Langfuse integration makes it straightforward to inspect failures turn by turn, which is the feedback loop you need when moving from hand-written tests to broader conversational evals.
-
-That combination is the main architectural point I would emphasize in an interview: not just that the agent works, but that it is structured to be measurable.
-
-This is the framing I would use for the application: the project is not only a working agent, but a small eval-friendly system where the riskiest behaviors are deterministic, observable, and easy to turn into regressions.
 
 ## Langfuse Tracing
 
