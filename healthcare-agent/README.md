@@ -1,8 +1,91 @@
 # Healthcare Appointment Conversational Agent
 
-A FastAPI backend that exposes a single conversational endpoint (`POST /chat`) for clinic patients to manage appointments.
 
-The key design goal is simple: **all appointment actions are blocked until identity verification succeeds**.
+This project uses a LangChain conversational agent to help patients manage their appointments. The key design goal is simple: **all appointment actions are blocked until identity verification succeeds**.
+
+This project has:
+1. A FastAPI backend that exposes a single conversational endpoint (`POST /chat`) for clinic patients to manage appointments.
+2. A CLI to easily interact with the backend.
+3. Simple evals and unit tests that could run on CI.
+4. Trace export to a Langfuse instance, which could be run locally.
+
+
+## How to run
+
+
+### Configuration
+
+Set these in environment variables or `.env`:
+
+- `OPENAI_API_KEY` (or `GROQ_API_KEY`)
+- `OPENAI_BASE_URL` (default: `https://api.groq.com/openai/v1`)
+- `OPENAI_MODEL` (default: `llama-3.3-70b-versatile`)
+
+Be sure to have [`uv` installed](https://docs.astral.sh/uv/getting-started/installation/).
+
+### Backend
+
+Run this to start the FastAPI server:
+
+```bash
+uv sync
+uv run fastapi dev main.py
+```
+
+****### Interactive CLI
+
+In another terminal:
+
+```bash
+uv run python -m app.clients.chat_cli
+```
+
+Useful CLI commands:
+
+- `/help`: Show commands
+- `/thread`: Show current thread_id
+- `/thread <id>`: Switch to a new thread_id
+- `/new`: Generate and switch to a random thread_id
+- `/exit`: Exit the chat
+
+### Tests
+
+```bash
+uv run pytest
+```
+
+
+
+## Project Layers at a Glance
+
+```text
+app/
+├── [agent] Agent Runtime (LangChain)
+│    > agent/runtime.py
+│
+├── [api] API Layer (FastAPI + Schemas)
+│    > api/main.py
+│    > api/schemas.py
+│
+├── [clients] Client Layer (CLI)
+│    > clients/chat_cli.py
+│
+├── [domain] Domain Layer (Mock data)
+│    > domain/mock_data.py
+│
+├── [session] Session/Auth layer
+│    > session/store.py
+│
+└── [tools] Tool Layer (Actions + Gating)
+     > tools/appointment_tools.py
+
+
+tests/
+└── Testing Layer (Evals + Unit tests)
+     > test_chat_flow.py
+
+```
+
 
 ## What this service does
 
@@ -100,52 +183,15 @@ Files: `app/clients/chat_cli.py`, `scripts/chat_cli.py`
 
 ## Design choices (why this shape)
 
-- **Deterministic authorization** lives in tools/session store, not in prompt text.
+- **Deterministic authorization** lives in session store and is used on tool cals. Prompt text additionally nudges the authorization to be done before attempting any other action, improving UX.
 - **Conversation quality** (memory, phrasing, rerouting) lives in agent + model.
 - **Mock-first implementation** keeps exercise scope tight while preserving realistic control flow.
-
-## Configuration
-
-Set these in environment variables or `.env`:
-
-- `OPENAI_API_KEY` (or `GROQ_API_KEY`)
-- `OPENAI_BASE_URL` (default: `https://api.groq.com/openai/v1`)
-- `OPENAI_MODEL` (default: `llama-3.3-70b-versatile`)
-
-## Run
-
-```bash
-uv sync
-uv run fastapi dev main.py
-```
-
-## Interactive CLI
-
-In another terminal:
-
-```bash
-uv run python scripts/chat_cli.py
-```
-
-Useful CLI commands:
-
-- `/help`
-- `/thread`
-- `/thread <id>`
-- `/new`
-- `/exit`
-
-## Tests
-
-```bash
-uv run pytest
-```
 
 ## Langfuse Tracing
 
 For local debugging, I've used [Langfuse](https://langfuse.com/self-hosting/deployment/docker-compose#get-started).
 
-The simplest way to do so is cloning the Langfuse repo and using `docker compose`, [as shown here](https://langfuse.com/self-hosting/deployment/docker-compose#get-started).
+The simplest way to do so is to clone the Langfuse repo somewhere, and using `docker compose`, [as shown here](https://langfuse.com/self-hosting/deployment/docker-compose#get-started).
 
   git clone https://github.com/langfuse/langfuse.git
   cd langfuse
