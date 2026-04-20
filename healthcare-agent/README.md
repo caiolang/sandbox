@@ -1,6 +1,3 @@
-caiolang@gmail.com
-LangfusePassword123!
-
 # Healthcare Appointment Conversational Agent
 
 A FastAPI backend that exposes a single conversational endpoint (`POST /chat`) for clinic patients to manage appointments.
@@ -130,7 +127,7 @@ In another terminal:
 uv run python scripts/chat_cli.py
 ```
 
-Useful commands:
+Useful CLI commands:
 
 - `/help`
 - `/thread`
@@ -164,9 +161,10 @@ LANGFUSE_BASE_URL=http://localhost:3000
 
 The backend initializes `langfuse.langchain.CallbackHandler` and attaches it to each agent invocation, so `/chat` requests are traced automatically.
 
-## Current limitations (intentional for v1)
+## Current limitations (intentional for this experiment)
 
 - In-memory only (no database persistence).
+- Mock data for users and appointments.
 - Session/auth state is per-process and per-thread.
 - No external auth token integration.
 - No streaming responses.
